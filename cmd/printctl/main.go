@@ -220,10 +220,21 @@ func getTargetIP(specifiedIP string) string {
 func startRESTServer(port int, defaultIP string) {
 	mux := http.NewServeMux()
 
+	// Helper for setting JSON and CORS headers
+	setCORSAndJSON := func(w http.ResponseWriter) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Content-Type", "application/json")
+	}
+
 	// GET /api/discover
 	mux.HandleFunc("/api/discover", func(w http.ResponseWriter, r *http.Request) {
+		setCORSAndJSON(w)
+		if r.Method == http.MethodOptions {
+			return
+		}
 		devices, _ := discovery.Discover(2 * time.Second)
-		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  "ok",
 			"devices": devices,
@@ -232,6 +243,10 @@ func startRESTServer(port int, defaultIP string) {
 
 	// GET /api/status?ip=...
 	mux.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
+		setCORSAndJSON(w)
+		if r.Method == http.MethodOptions {
+			return
+		}
 		ip := r.URL.Query().Get("ip")
 		if ip == "" {
 			ip = defaultIP
@@ -243,7 +258,6 @@ func startRESTServer(port int, defaultIP string) {
 			}
 		}
 		rep, err := status.GetStatus(ip)
-		w.Header().Set("Content-Type", "application/json")
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -254,6 +268,10 @@ func startRESTServer(port int, defaultIP string) {
 
 	// POST /api/scan?ip=...&dpi=300&format=jpeg
 	mux.HandleFunc("/api/scan", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		if r.Method == http.MethodOptions {
+			return
+		}
 		if r.Method != http.MethodPost && r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -316,6 +334,10 @@ func startRESTServer(port int, defaultIP string) {
 
 	// POST /api/print?ip=...
 	mux.HandleFunc("/api/print", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		if r.Method == http.MethodOptions {
+			return
+		}
 		if r.Method != http.MethodPost {
 			http.Error(w, "POST required", http.StatusMethodNotAllowed)
 			return
@@ -331,9 +353,10 @@ func startRESTServer(port int, defaultIP string) {
 			}
 		}
 
-		fileData, err := io.ReadAll(r.Body)
+		// Limit upload body to 50MB to prevent memory exhaustion
+		fileData, err := io.ReadAll(io.LimitReader(r.Body, 50*1024*1024))
 		if err != nil || len(fileData) == 0 {
-			http.Error(w, "Empty file body", http.StatusBadRequest)
+			http.Error(w, "Empty file body or read error", http.StatusBadRequest)
 			return
 		}
 

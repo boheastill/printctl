@@ -99,12 +99,16 @@ func ExecuteScan(opts ScanOptions) error {
 		nextDocURL = fmt.Sprintf("http://%s%s/NextDocument", opts.IP, location)
 	}
 
-	// Poll until hardware optical scan completes
+	// Poll until hardware optical scan completes (600 DPI needs more time for motor pass)
+	maxPolls := 30
+	if opts.DPI >= 600 {
+		maxPolls = 60
+	}
 	pullClient := &http.Client{Timeout: 30 * time.Second}
 	var data []byte
 	var lastErr error
 
-	for i := 0; i < 25; i++ {
+	for i := 0; i < maxPolls; i++ {
 		time.Sleep(1500 * time.Millisecond)
 		docResp, err := pullClient.Get(nextDocURL)
 		if err != nil {
