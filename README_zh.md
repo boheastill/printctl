@@ -143,5 +143,17 @@ printctl serve --port 8080
 
 ---
 
+## 🧩 技术揭秘与硬核亮点 (Under the Hood)
+
+* **零守护进程架构 (Zero-Daemon)**：单文件纯静态 Go 编译，空闲时 0 内存占用，无需 root 权限与系统常驻后台。
+* **纯内存防翻车排版引擎**：在内存中直接将透明度 Alpha 拍平为纯白底色（杜绝透明 PNG 打成大黑底），内置 5mm 物理安全边距，数学上杜绝多吐白纸。
+* **原生 AI MCP 协议引擎**：内置标准 JSON-RPC 2.0 stdio 管道，大模型（Claude / Cursor / DeepSeek）无缝即插即用。
+* **亚秒级 254 协程并发自发现**：自动扫描本地 `/24` 子网，200 毫秒内锁定可用打印机 IP。
+* **严格遵循公开行业标准**：**eSCL 2.9 (HTTP 80)** 扫描 + **IPP Everywhere RFC 8011 (HTTP 631)** 打印，通杀佳能、惠普、爱普生等绝大多数网络机型。
+
+📖 **查看完整的协议状态机、数据帧格式与数学推导，请阅读 [技术架构白皮书 (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md)。**
+
+---
+
 ## 📄 开源协议
 MIT License. 自由用于开源、个人与商业项目。

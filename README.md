@@ -148,5 +148,17 @@ Now your AI Agent natively possesses:
 
 ---
 
+## 🧩 Under the Hood (Technical Highlights)
+
+* **Zero-Daemon Architecture**: Pure Go single binary (`CGO_ENABLED=0`), 0 resident memory when idle, zero root privileges needed.
+* **Anti-Fail In-Memory Layout**: Decodes images into memory, flattens alpha channels onto `#FFFFFF` white (no black squares), clamps 5mm hardware margins to guarantee zero pagination overflow.
+* **Native AI MCP Server**: Built-in JSON-RPC 2.0 stdio engine for instant integration with Claude Desktop, Cursor, and DeepSeek.
+* **Sub-Second Auto-Discovery**: 254 non-blocking Goroutines sweep local subnets to resolve printer IP in `< 0.2s`.
+* **Standard Wire Protocols**: Communicates over **eSCL 2.9 REST (Port 80)** and **IPP Everywhere RFC 8011 (Port 631)**.
+
+📖 **For deep protocol state machines, packet frames, and mathematical layout proofs, read the [Architecture Whitepaper](docs/ARCHITECTURE.md).**
+
+---
+
 ## 📄 License
 MIT License. Free for open-source, personal, and commercial software.
