@@ -76,6 +76,8 @@ func main() {
 	portFlag := fs.Int("port", 8080, "Port for HTTP REST server")
 	dpiFlag := fs.Int("dpi", 300, "Resolution in DPI (75, 150, 300, 600)")
 	colorFlag := fs.String("color", "RGB24", "Color mode (RGB24, Grayscale8)")
+	duplexFlag := fs.Bool("duplex", false, "Enable manual foolproof two-sided printing (long-edge)")
+	sidesFlag := fs.String("sides", "one-sided", "Sides mode: one-sided, two-sided-long-edge, two-sided-short-edge")
 	jsonFlag := fs.Bool("json", false, "Output in JSON format")
 
 	if err := fs.Parse(os.Args[2:]); err != nil {
@@ -165,28 +167,47 @@ func main() {
 			fmt.Fprintln(os.Stderr, "Error: please specify a file to print (e.g., printctl print ./document.pdf)")
 			os.Exit(1)
 		}
-		filePath := args[0]
 		targetIP := getTargetIP(*ipFlag)
-
 		opts := print.DefaultPrintOptions(targetIP)
-		if !*jsonFlag {
-			fmt.Printf("[*] Sending print job to %s via IPP Everywhere: %s\n", targetIP, filePath)
+
+		sidesMode := *sidesFlag
+		if *duplexFlag {
+			sidesMode = "two-sided-long-edge"
 		}
-		err := print.PrintFile(filePath, opts)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Print failed: %v\n", err)
-			os.Exit(1)
-		}
-		if *jsonFlag {
-			res := map[string]interface{}{
-				"status": "success",
-				"file":   filePath,
-				"ip":     targetIP,
+
+		if len(args) > 1 || sidesMode != "one-sided" {
+			// Multi-page or duplex workflow
+			duplexOpts := print.DuplexOptions{
+				PrintOpts: opts,
+				Manual:    true,
+				Sides:     sidesMode,
 			}
-			enc, _ := json.MarshalIndent(res, "", "  ")
-			fmt.Println(string(enc))
+			err := print.PrintDuplexImages(args, duplexOpts)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Duplex print failed: %v\n", err)
+				os.Exit(1)
+			}
 		} else {
-			fmt.Println("[+] Print job spooled successfully! Physical page output in progress.")
+			filePath := args[0]
+			if !*jsonFlag {
+				fmt.Printf("[*] Sending print job to %s via IPP Everywhere: %s\n", targetIP, filePath)
+			}
+			err := print.PrintFile(filePath, opts)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Print failed: %v\n", err)
+				os.Exit(1)
+			}
+			if *jsonFlag {
+				res := map[string]interface{}{
+					"status": "success",
+					"file":   filePath,
+					"ip":     targetIP,
+				}
+				enc, _ := json.MarshalIndent(res, "", "  ")
+				fmt.Println(string(enc))
+			} else {
+				fmt.Println("[+] Print job spooled successfully! Physical page output in progress.")
+			}
 		}
 
 	case "serve":

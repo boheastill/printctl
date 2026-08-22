@@ -33,7 +33,7 @@ func DefaultPrintOptions(ip string) PrintOptions {
 	}
 }
 
-// PrintFile prints a file (PDF or Image) to the network printer via IPP
+// PrintFile prints a file (Image or PDF) to the network printer via IPP
 func PrintFile(filePath string, opts PrintOptions) error {
 	fileData, err := os.ReadFile(filePath)
 	if err != nil {
@@ -47,22 +47,27 @@ func PrintFile(filePath string, opts PrintOptions) error {
 
 	if isPDF {
 		payload = fileData
-		mimeType = "application/pdf"
+		mimeType = "application/octet-stream"
 	} else {
-		// Image input: process through normalization & PDF canvas layout engine
-		pdfData, err := ImageToA4PDF(fileData)
+		// Image input: process through normalization & A4 canvas layout engine
+		jpegData, err := NormalizeImageToA4JPEG(fileData)
 		if err != nil {
-			return fmt.Errorf("failed to layout image onto A4 PDF: %w", err)
+			return fmt.Errorf("failed to layout image onto A4: %w", err)
 		}
-		payload = pdfData
-		mimeType = "application/pdf"
+		payload = jpegData
+		mimeType = "image/jpeg"
 	}
 
 	return SendIPPPrintJob(opts.IP, payload, mimeType, filePath)
 }
 
-// ImageToA4PDF takes any raw image, flattens alpha onto white, fits into A4 with safe margins, and outputs a valid PDF
-func ImageToA4PDF(imgBytes []byte) ([]byte, error) {
+// NormalizeImageToA4JPEG flattens alpha onto white, fits into A4 @ 300DPI with safe margins
+func NormalizeImageToA4JPEG(imgBytes []byte) ([]byte, error) {
+	return NormalizeImageToA4JPEGWithMark(imgBytes, false)
+}
+
+// NormalizeImageToA4JPEGWithMark adds optional foolproof duplex corner indicator
+func NormalizeImageToA4JPEGWithMark(imgBytes []byte, addCornerMark bool) ([]byte, error) {
 	srcImg, _, err := image.Decode(bytes.NewReader(imgBytes))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode image: %w", err)
@@ -73,90 +78,94 @@ func ImageToA4PDF(imgBytes []byte) ([]byte, error) {
 	w := bounds.Dx()
 	h := bounds.Dy()
 
-	whiteCanvas := image.NewRGBA(image.Rect(0, 0, w, h))
-	draw.Draw(whiteCanvas, whiteCanvas.Bounds(), &image.Uniform{color.White}, image.Point{}, draw.Src)
-	draw.Draw(whiteCanvas, whiteCanvas.Bounds(), srcImg, bounds.Min, draw.Over)
+	// A4 Dimensions at 300 DPI
+	const a4W = 2480
+	const a4H = 3508
+	const margin = 80 // ~7mm safe margin
 
-	// 2. Encode to high-quality JPEG stream for PDF embedding
-	var jpegBuf bytes.Buffer
-	err = jpeg.Encode(&jpegBuf, whiteCanvas, &jpeg.Options{Quality: 95})
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode normalized JPEG: %w", err)
-	}
-	jpegData := jpegBuf.Bytes()
+	printableW := a4W - (2 * margin)
+	printableH := a4H - (2 * margin)
 
-	// 3. A4 Dimensions in Points (72 points per inch: 595.28 x 841.89)
-	pageWidth := 595.28
-	pageHeight := 841.89
-	margin := 20.0 // ~7mm safe margin
-
-	printableWidth := pageWidth - (2 * margin)
-	printableHeight := pageHeight - (2 * margin)
+	// Create White A4 Canvas
+	canvas := image.NewRGBA(image.Rect(0, 0, a4W, a4H))
+	draw.Draw(canvas, canvas.Bounds(), &image.Uniform{color.White}, image.Point{}, draw.Src)
 
 	// Calculate aspect ratio scaling
 	imgAspect := float64(w) / float64(h)
-	pageAspect := printableWidth / printableHeight
+	pageAspect := float64(printableW) / float64(printableH)
 
-	var drawW, drawH, drawX, drawY float64
+	var drawW, drawH, drawX, drawY int
 
 	if imgAspect > pageAspect {
 		// Image is wider than printable area: fit to width
-		drawW = printableWidth
-		drawH = printableWidth / imgAspect
+		drawW = printableW
+		drawH = int(float64(printableW) / imgAspect)
 		drawX = margin
-		drawY = margin + ((printableHeight - drawH) / 2.0)
+		drawY = margin + ((printableH - drawH) / 2)
 	} else {
 		// Image is taller than printable area: fit to height
-		drawH = printableHeight
-		drawW = printableHeight * imgAspect
-		drawX = margin + ((printableWidth - drawW) / 2.0)
+		drawH = printableH
+		drawW = int(float64(printableH) * imgAspect)
+		drawX = margin + ((printableW - drawW) / 2)
 		drawY = margin
 	}
 
-	// 4. Construct Minimal Single-Page PDF with embedded JPEG
-	return buildSimplePDF(jpegData, w, h, pageWidth, pageHeight, drawX, drawY, drawW, drawH)
-}
+	// Scale and composite image onto white canvas
+	targetRect := image.Rect(drawX, drawY, drawX+drawW, drawY+drawH)
+	scaleAndDraw(canvas, targetRect, srcImg)
 
-func buildSimplePDF(jpegData []byte, imgW, imgH int, pageW, pageH, x, y, w, h float64) ([]byte, error) {
-	var pdf bytes.Buffer
-	offsets := make([]int, 6)
-
-	pdf.WriteString("%PDF-1.4\n")
-
-	// Object 1: Catalog
-	offsets[1] = pdf.Len()
-	pdf.WriteString("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
-
-	// Object 2: Pages
-	offsets[2] = pdf.Len()
-	pdf.WriteString("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n")
-
-	// Object 3: Page
-	offsets[3] = pdf.Len()
-	fmt.Fprintf(&pdf, "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2f %.2f] /Contents 4 0 R /Resources << /XObject << /Im1 5 0 R >> >> >>\nendobj\n", pageW, pageH)
-
-	// Object 4: Contents (Position and scale image)
-	contentStream := fmt.Sprintf("q\n%.2f 0 0 %.2f %.2f %.2f cm\n/Im1 Do\nQ\n", w, h, x, y)
-	offsets[4] = pdf.Len()
-	fmt.Fprintf(&pdf, "4 0 obj\n<< /Length %d >>\nstream\n%sendstream\nendobj\n", len(contentStream), contentStream)
-
-	// Object 5: Image XObject (JPEG DCTDecode)
-	offsets[5] = pdf.Len()
-	fmt.Fprintf(&pdf, "5 0 obj\n<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length %d >>\nstream\n", imgW, imgH, len(jpegData))
-	pdf.Write(jpegData)
-	pdf.WriteString("\nendstream\nendobj\n")
-
-	// Cross-Reference Table
-	xrefOffset := pdf.Len()
-	pdf.WriteString("xref\n0 6\n0000000000 65535 f \n")
-	for i := 1; i <= 5; i++ {
-		fmt.Fprintf(&pdf, "%010d 00000 n \n", offsets[i])
+	// Draw Foolproof Duplex Corner Mark in Top-Right Corner if requested
+	if addCornerMark {
+		markCol := color.RGBA{71, 85, 105, 255} // Slate 600
+		// Small corner indicator box in top right
+		for y := 40; y < 90; y++ {
+			for x := a4W - 120; x < a4W - 40; x++ {
+				canvas.Set(x, y, markCol)
+			}
+		}
 	}
 
-	// Trailer
-	fmt.Fprintf(&pdf, "trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", xrefOffset)
+	// Encode to clean, high-quality JPEG stream for direct printer ASIC intake
+	var jpegBuf bytes.Buffer
+	err = jpeg.Encode(&jpegBuf, canvas, &jpeg.Options{Quality: 95})
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode normalized JPEG: %w", err)
+	}
 
-	return pdf.Bytes(), nil
+	return jpegBuf.Bytes(), nil
+}
+
+// Bilinear scaling into target rectangle
+func scaleAndDraw(dst *image.RGBA, r image.Rectangle, src image.Image) {
+	srcBounds := src.Bounds()
+	srcW := srcBounds.Dx()
+	srcH := srcBounds.Dy()
+	dstW := r.Dx()
+	dstH := r.Dy()
+
+	white := color.RGBA{255, 255, 255, 255}
+
+	for y := 0; y < dstH; y++ {
+		srcY := srcBounds.Min.Y + (y * srcH / dstH)
+		for x := 0; x < dstW; x++ {
+			srcX := srcBounds.Min.X + (x * srcW / dstW)
+			c := src.At(srcX, srcY)
+
+			// Alpha blending onto white
+			rVal, gVal, bVal, aVal := c.RGBA()
+			if aVal == 0 {
+				dst.Set(r.Min.X+x, r.Min.Y+y, white)
+			} else if aVal == 0xFFFF {
+				dst.Set(r.Min.X+x, r.Min.Y+y, color.RGBA{uint8(rVal >> 8), uint8(gVal >> 8), uint8(bVal >> 8), 255})
+			} else {
+				alpha := float64(aVal) / 65535.0
+				r8 := uint8((float64(rVal>>8)*alpha + 255*(1-alpha)))
+				g8 := uint8((float64(gVal>>8)*alpha + 255*(1-alpha)))
+				b8 := uint8((float64(bVal>>8)*alpha + 255*(1-alpha)))
+				dst.Set(r.Min.X+x, r.Min.Y+y, color.RGBA{r8, g8, b8, 255})
+			}
+		}
+	}
 }
 
 // SendIPPPrintJob constructs a standard RFC 8011 IPP Print-Job request and sends to port 631
@@ -220,7 +229,7 @@ func SendIPPPrintJob(printerIP string, documentData []byte, mimeType string, job
 	respData, err := io.ReadAll(resp.Body)
 	if err == nil && len(respData) >= 4 {
 		statusCode := int(respData[2])<<8 | int(respData[3])
-		if statusCode > 0x00FF { // 0x0000 - 0x00FF are successful status codes in IPP
+		if statusCode > 0x00FF {
 			return fmt.Errorf("IPP server returned error code 0x%04X", statusCode)
 		}
 	}
