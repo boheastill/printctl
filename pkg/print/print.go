@@ -116,10 +116,14 @@ func NormalizeImageToA4JPEGWithMark(imgBytes []byte, addCornerMark bool) ([]byte
 
 	// Draw Foolproof Duplex Corner Mark in Top-Right Corner if requested
 	if addCornerMark {
-		markCol := color.RGBA{71, 85, 105, 255} // Slate 600
-		// Small corner indicator box in top right
-		for y := 40; y < 90; y++ {
-			for x := a4W - 120; x < a4W - 40; x++ {
+		markCol := color.RGBA{100, 116, 139, 255} // Slate 500
+		// Draw downward arrow indicator in top right leading edge
+		for y := 30; y < 75; y++ {
+			for x := a4W - 140; x < a4W - 30; x++ {
+				// Arrow tip & box
+				if y > 55 && (x < a4W-100 || x > a4W-70) {
+					continue
+				}
 				canvas.Set(x, y, markCol)
 			}
 		}
