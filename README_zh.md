@@ -85,7 +85,10 @@ printctl scan ./photo_600dpi.jpg --dpi 600
 printctl print ./photo.png
 printctl print ./document.pdf
 
-# 4. JSON 格式遥测状态：
+# 4. 沉入式防呆双面打印（自动奇偶分页，带角标物理指引）：
+printctl print page1.png page2.png --duplex
+
+# 5. JSON 格式遥测状态：
 printctl status --json
 ```
 

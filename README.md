@@ -89,7 +89,10 @@ printctl scan ./photo_600dpi.jpg --dpi 600
 printctl print ./photo.png
 printctl print ./document.pdf
 
-# 4. Telemetry status in JSON:
+# 4. Foolproof manual double-sided (duplex) printing:
+printctl print page1.png page2.png --duplex
+
+# 5. Telemetry status in JSON:
 printctl status --json
 ```
 
