@@ -80,8 +80,14 @@ The scanner pipeline communicates directly with the printer's onboard HTTP serve
 ### 2.2 Driverless Printing (IPP Everywhere / RFC 8011)
 The print pipeline constructs standard IPP binary frames sent to `http://<IP>:631/ipp/print`:
 * **Header**: Version `0x0200` (IPP 2.0), Operation `0x0002` (Print-Job), Request-ID `1`.
-* **Attributes**: `attributes-charset=utf-8`, `printer-uri`, `document-format=application/pdf`.
-* **Payload**: Raw single-page PDF with normalized dimensions and hardware safe margins.
+* **Attributes**: `attributes-charset=utf-8`, `printer-uri`, `document-format=image/jpeg` (or `image/pwg-raster`).
+* **Hardware Ingest Capabilities (Known Device Traits)**:
+  Consumer network ink-tank hardware natively supports:
+  * `image/jpeg` (Direct hardware ASIC JPEG rendering)
+  * `image/pwg-raster` (PWG Standard Raster)
+  * `image/urf` (Apple AirPrint UNIRAST)
+  * `application/octet-stream`
+* **Payload**: Clean normalized single-page stream with 300 DPI geometry and hardware safe margins.
 
 ---
 
