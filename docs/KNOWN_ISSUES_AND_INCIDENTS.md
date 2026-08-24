@@ -19,3 +19,14 @@
 
 * **现象描述**：
   在进行批量双面打印 14 页（7 张 A4 纸）时，最终拿到的纸张中，第 7 张纸表现为**“印有第 13 页正面的留白，背面就是结尾（第 14 页），中间没有夹带白纸”**。
+
+---
+
+## 3. 🚨 G3030 纯光栅机型：PDF/PNG 被静默丢弃，但命令报打印成功（2026-08-23）
+
+* **现象描述**：
+  Canon G3030 (G3833) 上 `printctl print` PDF 或 PNG，返回 `[+] Print job spooled successfully!`，但**无出纸、无报错、`Get-Jobs` 两头皆空**——打印机接受作业后静默丢弃。
+* **根因**：
+  该机型 `document-format-supported` 仅 `image/jpeg / image/urf / image/pwg-raster / application/octet-stream`，**无 PDF 解释器，PNG 亦不支持**。同机另发现：多文件批量默认 duplex 属性直接 `0x0507`（无双面器）；单作业槽忙时新作业同样报 `0x0507`。
+* **详细报告与修复工单**：👉 [`INCIDENT_2026-08-23_G3030_FORMAT_SILENT_DROP.md`](INCIDENT_2026-08-23_G3030_FORMAT_SILENT_DROP.md)（含已验证 workaround、IPP 探测代码、BUG-1~3 验收标准）
+* **临时规避**：用 `~/bin/bh-print`（Chrome→PDF→JPEG@220dpi→逐页重试进槽，实测 8/8 出纸）。
