@@ -97,6 +97,7 @@ func main() {
 	colorFlag := fs.String("color", "RGB24", "Color mode (RGB24, Grayscale8)")
 	duplexFlag := fs.Bool("duplex", false, "Enable manual foolproof two-sided printing (long-edge)")
 	sidesFlag := fs.String("sides", "one-sided", "Sides mode: one-sided, two-sided-long-edge, two-sided-short-edge")
+	paperFlag := fs.String("paper", "A4", "Paper size: A4, 4x6 (photo)")
 	jsonFlag := fs.Bool("json", false, "Output in JSON format")
 
 	// Parse with normalized argument order
@@ -190,6 +191,7 @@ func main() {
 		}
 		targetIP := getTargetIP(*ipFlag)
 		opts := print.DefaultPrintOptions(targetIP)
+		opts.PaperSize = *paperFlag
 
 		sidesMode := *sidesFlag
 		if *duplexFlag {
