@@ -165,3 +165,7 @@ Now your AI Agent natively possesses:
 
 ## 📄 License
 MIT License. Free for open-source, personal, and commercial software.
+
+---
+
+**Author**: [Bohea](https://boheastill.com) — independent industrial software engineer (Shenzhen). Operator HMIs · device integration · machine data into your customer's ERP. More runnable demos & engineering notes on the site.
