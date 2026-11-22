@@ -43,3 +43,11 @@
 ### 2026-08-25 补充：4x6 竖版留白（letterbox）被固件"智能填充"破坏
 
 本地导出验证发送的 JPEG 无误（1200×1800@300DPI，内容居中留白正确），但固件对相纸作业强制自动填充：纯白留白边 → 内容 bbox 放大 3 倍裁切（纸满、图剩 1/3）；浅灰(254)留白边 → 整张空白（疑似自动照片修正洗白）。**结论：JPEG 管线在 4x6 上只有"满幅旋转版"输出正确**（横图转 90° 铺满，横持相纸观看）。竖版留白需 PWG-Raster 自描述页面才可能实现，未验证。
+
+---
+
+## 5. Windows 11 原生免驱（Microsoft IPP Class Driver）速度差异与无头打印踩坑（2026-11-22）
+
+- **速度对比根因**：Windows 内置 `Microsoft IPP Class Driver` 默认以 **`600×600 DPI` + `psk:Color` 彩色 `image/pwg-raster`** 下发（触发 `CH-8` 彩头多遍往复，约 15~18s/页），而 `printctl` 直推 **`300×300 DPI` `image/jpeg`**（走机身 ASIC 硬件解码），因此原生 IPP 默认比 `printctl` 慢。日常纯文档可通过 `Set-PrintConfiguration -Color $false` 切黑白模式（强制走 `BH-8` 颜料黑宽喷头）提速约 2 倍。
+- **自动化与配网连环坑**：涵盖 `Public` 网络拦发现、休眠首包 >600ms 漏扫、`tun0` 下 `.local` 解析超时、WinRT `Windows.Data.Pdf` 因回调线程冲突吐白纸及 GPU 挂起崩溃、以及最终零依赖 `msedge.exe --kiosk-printing --disable-gpu` 矢量直出方案。
+- **完整排查与复用文档**：👉 [`WINDOWS_NATIVE_IPP_AND_HEADLESS_PRINTING.md`](WINDOWS_NATIVE_IPP_AND_HEADLESS_PRINTING.md)
