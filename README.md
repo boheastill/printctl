@@ -168,4 +168,4 @@ MIT License. Free for open-source, personal, and commercial software.
 
 ---
 
-**Author**: [Bohea](https://boheastill.com) — independent industrial software engineer (Shenzhen). Operator HMIs · device integration · machine data into your customer's ERP. More runnable demos & engineering notes on the site.
+**Need driverless LAN printing/scanning or local hardware integration for your ERP/WMS?** I build zero-dependency protocol bridges, shop-floor agents, and device integrations. **[3-day Feasibility Sprint ($750)](https://boheastill.com/sprint/?r=gh-printctl)** · **[hi@boheastill.com](mailto:hi@boheastill.com)** · **[boheastill.com](https://boheastill.com/?r=gh-printctl)**
