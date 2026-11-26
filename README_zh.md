@@ -160,3 +160,7 @@ printctl serve --port 8080
 
 ## 📄 开源协议
 MIT License. 自由用于开源、个人与商业项目。
+
+---
+
+**需要将云端 ERP/WMS 对接局域网打印机、扫描仪或产线硬件？** 承接零依赖协议桥接、设备集成与固定范围工程交付 → **[hi@boheastill.com](mailto:hi@boheastill.com)** · **[boheastill.com/zh](https://boheastill.com/zh/?r=gh-printctl)**
